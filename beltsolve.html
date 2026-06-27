@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BELTSOLVE — parametric timing-belt drive solver</title>
+<style>
+  :root{
+    --bg:#0a0905; --panel:#100d06; --line:#2a2008;
+    --amber:#ffb000; --amber-hi:#ffd166; --amber-dim:#8a6a1e;
+    --green:#7CFF6B; --red:#ff5c4d; --warn:#ffb000;
+    --mono:"SF Mono",ui-monospace,"DejaVu Sans Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--amber);font-family:var(--mono)}
+  body{
+    font-size:14px;line-height:1.45;
+    background-image:repeating-linear-gradient(0deg,rgba(255,176,0,.025) 0 1px,transparent 1px 3px);
+    padding:clamp(14px,3vw,40px);
+  }
+  a{color:var(--amber-hi)}
+  .wrap{max-width:980px;margin:0 auto}
+  header{border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:20px}
+  h1{font-size:clamp(20px,4vw,30px);margin:0;letter-spacing:.18em;color:var(--amber-hi);
+     text-shadow:0 0 14px rgba(255,176,0,.35)}
+  .sub{color:var(--amber-dim);letter-spacing:.06em;margin-top:4px;font-size:12px}
+  .cursor{display:inline-block;width:9px;height:1.05em;background:var(--amber);
+     translate:0 2px;margin-left:4px;animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
+  .field{border:1px solid var(--line);background:var(--panel);padding:10px 11px}
+  .field .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+  .field label{color:var(--amber-dim);font-size:11px;letter-spacing:.14em}
+  .lock{
+    cursor:pointer;user-select:none;font-size:10px;letter-spacing:.12em;
+    border:1px solid var(--line);padding:2px 7px;color:var(--amber-dim);background:transparent;
+    font-family:var(--mono);transition:.12s;
+  }
+  .lock[data-on="1"]{color:var(--bg);background:var(--amber);border-color:var(--amber);
+     box-shadow:0 0 10px rgba(255,176,0,.4)}
+  .field input{
+    width:100%;background:#0c0a04;border:1px solid var(--line);color:var(--amber-hi);
+    font-family:var(--mono);font-size:18px;padding:6px 8px;outline:none;
+  }
+  .field input:focus{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
+  .field input:disabled{color:#3c3214;border-style:dashed;background:transparent}
+  .field .unit{color:var(--amber-dim);font-size:10px;letter-spacing:.1em;margin-top:4px;min-height:12px}
+  select{
+    width:100%;background:#0c0a04;border:1px solid var(--line);color:var(--amber-hi);
+    font-family:var(--mono);font-size:15px;padding:6px 8px;outline:none
+  }
+  select:focus{border-color:var(--amber)}
+
+  .controls{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin:14px 0 18px;
+     border-top:1px dashed var(--line);padding-top:16px}
+  .ctl{display:flex;flex-direction:column;gap:4px}
+  .ctl label{color:var(--amber-dim);font-size:11px;letter-spacing:.1em}
+  .ctl input,.ctl select{font-size:13px;padding:4px 6px;width:92px}
+  .ctl.ratio input{width:110px}
+  button.run{
+    margin-left:auto;cursor:pointer;font-family:var(--mono);letter-spacing:.16em;
+    background:var(--amber);color:var(--bg);border:none;padding:11px 26px;font-size:14px;font-weight:700;
+    box-shadow:0 0 16px rgba(255,176,0,.45);transition:.12s
+  }
+  button.run:hover{background:var(--amber-hi)}
+  button.run:active{translate:0 1px}
+
+  .msg{color:var(--amber-dim);font-size:12px;min-height:16px;margin-bottom:10px;white-space:pre-wrap}
+  .msg.err{color:var(--red)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{ text-align:left;color:var(--amber-dim);font-weight:400;font-size:10px;letter-spacing:.13em;
+     border-bottom:1px solid var(--line);padding:6px 8px}
+  td{padding:7px 8px;border-bottom:1px solid #19130699}
+  tr.row:hover{background:#160f04}
+  td.lead{color:var(--amber-hi);font-size:15px;white-space:nowrap}
+  td.num{font-variant-numeric:tabular-nums}
+  .pill{font-size:10px;letter-spacing:.08em;padding:2px 7px;border:1px solid currentColor;white-space:nowrap}
+  .ok{color:var(--green)} .warnc{color:var(--warn)} .bad{color:var(--red)}
+  .verdict-note{color:var(--amber-dim);font-size:11px;margin-top:2px}
+  .best{box-shadow:-2px 0 0 var(--amber) inset}
+
+  footer{margin-top:26px;border-top:1px solid var(--line);padding-top:14px;color:var(--amber-dim);font-size:11px}
+  .eq{color:var(--amber);background:var(--panel);border:1px solid var(--line);padding:9px 11px;margin:8px 0;
+     overflow-x:auto;white-space:nowrap;font-size:12px}
+  .hint{color:var(--amber-dim);font-size:11px;letter-spacing:.04em}
+  details summary{cursor:pointer;color:var(--amber-dim)}
+  @media (max-width:560px){ td.hideS,th.hideS{display:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>BELTSOLVE<span class="cursor"></span></h1>
+    <div class="sub">parametric timing-belt drive solver · lock what's fixed, solve the rest</div>
+  </header>
+
+  <p class="hint" style="margin-top:0">
+    Toggle <span style="color:var(--amber)">LOCK</span> on whatever is fixed in your design — a center distance, a belt
+    you own, both pulleys. Leave the rest on <span style="color:var(--amber-dim)">SOLVE</span> and run. Anchor the solve
+    with at least a center distance <em>or</em> a belt (or lock both pulleys).
+  </p>
+
+  <div class="grid">
+    <div class="field" id="f_N1">
+      <div class="top"><label>PULLEY A</label><button class="lock" data-on="0">SOLVE</button></div>
+      <input type="number" min="6" step="1" placeholder="teeth" disabled>
+      <div class="unit">teeth</div>
+    </div>
+    <div class="field" id="f_N2">
+      <div class="top"><label>PULLEY B</label><button class="lock" data-on="0">SOLVE</button></div>
+      <input type="number" min="6" step="1" placeholder="teeth" disabled>
+      <div class="unit">teeth</div>
+    </div>
+    <div class="field" id="f_C">
+      <div class="top"><label>CENTER DIST</label><button class="lock" data-on="1">LOCK</button></div>
+      <input type="number" min="1" step="0.1" value="55">
+      <div class="unit">mm, shaft to shaft</div>
+    </div>
+    <div class="field" id="f_T">
+      <div class="top"><label>BELT</label><button class="lock" data-on="1">LOCK</button></div>
+      <input type="number" min="10" step="1" value="63">
+      <div class="unit" id="beltunit">teeth · 189.0 mm pitch length</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="ctl">
+      <label>PITCH</label>
+      <select id="pitch">
+        <option value="2">GT2 / 2GT — 2.0 mm</option>
+        <option value="3" selected>GT3 / 3GT — 3.0 mm</option>
+        <option value="3hd">HTD 3M — 3.0 mm</option>
+        <option value="5">HTD 5M — 5.0 mm</option>
+        <option value="8">HTD 8M — 8.0 mm</option>
+        <option value="2.032">MXL — 2.032 mm</option>
+        <option value="5.08">XL — 5.08 mm</option>
+      </select>
+    </div>
+    <div class="ctl ratio">
+      <label>TARGET RATIO <span style="color:#4d3d12">(optional)</span></label>
+      <input id="ratio" type="text" placeholder="e.g. 2  or  3:2">
+    </div>
+    <div class="ctl">
+      <label>TEETH MIN</label><input id="nmin" type="number" value="10" min="6" step="1">
+    </div>
+    <div class="ctl">
+      <label>TEETH MAX</label><input id="nmax" type="number" value="80" min="10" step="1">
+    </div>
+    <button class="run" id="run">SOLVE ▸</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+  <div id="results"></div>
+
+  <footer>
+    <div>Exact open-drive geometry — both wrap angles, not the small-angle approximation:</div>
+    <div class="eq">L = 2·√(C²−d²) + π·(r₁+r₂) + 2·d·asin(d/C) &nbsp;&nbsp;where r=N·p/2π, &nbsp; d=|r₂−r₁|</div>
+    <details>
+      <summary>notes &amp; conventions</summary>
+      <div style="margin-top:8px;line-height:1.6">
+        • <b>Slack</b> = belt path length − geometric path at the actual center. Positive = belt is long (tensionable);
+          negative = belt is short (interference — size up or pull centers in).<br>
+        • <b>Exact C</b> = the center distance where that pulley pair tensions the chosen belt with zero slack.<br>
+        • Belt path length responds ~2× center distance (dL/dC ≈ 2 for d≪C), so 1 mm of center ≈ 2 mm of belt.<br>
+        • Idler take-up shown is a rough midspan estimate; real take-up depends on idler position and wrap.<br>
+        • Tooth range and pitch are yours to set. Pitch diameter, not OD, drives the geometry.
+      </div>
+    </details>
+    <div style="margin-top:10px;color:#4d3d12">beltsolve · single file · no deps · runs offline</div>
+  </footer>
+</div>
+
+<script>
+const TAU = Math.PI*2;
+const pr = (N,p)=> N*p/TAU;
+function geoLength(N1,N2,C,p){
+  const r1=pr(N1,p), r2=pr(N2,p), d=Math.abs(r2-r1);
+  if(C<=d) return null;
+  const straight = 2*Math.sqrt(C*C - d*d);
+  const beta = Math.asin(d/C);
+  return straight + Math.PI*(r1+r2) + 2*beta*d;
+}
+function solveC(N1,N2,T,p){
+  const Lt=T*p;
+  let lo=Math.abs(pr(N2,p)-pr(N1,p))+1e-6, hi=Lt;
+  if(geoLength(N1,N2,hi,p)<Lt) return null;
+  for(let i=0;i<160;i++){const m=(lo+hi)/2,L=geoLength(N1,N2,m,p);
+    if(L===null){lo=m;continue} if(L<Lt) lo=m; else hi=m;}
+  return (lo+hi)/2;
+}
+// pitch value resolver (HTD3M shares 3mm geometry; tag only changes label)
+const pitchVal = v => parseFloat(v);
+
+function niceRatioBonus(r){
+  if(r<1) r = 1/r;
+  const cands=[1,1.25,4/3,1.5,5/3,2,2.5,3,10/3,4,5];
+  let best=9; for(const c of cands) best=Math.min(best,Math.abs(r-c));
+  return best<0.012 ? -1.1 : (best<0.04 ? -0.5 : 0);
+}
+
+function solve(cfg){
+  const {p,N1,N2,C,T,ratio,Nmin,Nmax,limit}=cfg;
+  const n1List=(N1!=null)?[N1]:rng(Nmin,Nmax);
+  const n2List=(N2!=null)?[N2]:rng(Nmin,Nmax);
+  const cLocked=C!=null, tLocked=T!=null;
+  const out=[];
+  for(const a of n1List) for(const b of n2List){
+    if(N1==null&&N2==null&&b<a) continue;
+    if(ratio!=null && (N1==null||N2==null)){
+      if(N1==null&&N2==null){ if(b!==Math.round(a*ratio)) continue; }
+      else if(N1!=null){ if(b!==Math.round(N1*ratio)) continue; }
+      else { if(a!==Math.round(N2/ratio)) continue; }
+    }
+    let actualC,beltT,slack;
+    if(cLocked&&tLocked){ actualC=C; beltT=T; const g=geoLength(a,b,C,p); if(g==null)continue; slack=T*p-g; }
+    else if(cLocked&&!tLocked){ const g=geoLength(a,b,C,p); if(g==null)continue;
+      beltT=Math.round(g/p); actualC=C; slack=beltT*p-geoLength(a,b,C,p); }
+    else if(!cLocked&&tLocked){ const sc=solveC(a,b,T,p); if(sc==null)continue; actualC=sc; beltT=T; slack=0; }
+    else continue;
+    const exactC=solveC(a,b,beltT,p);
+    out.push({N1:a,N2:b,ratio:b/a,beltT,actualC,exactC,slack});
+  }
+  for(const s of out){
+    let cost = (s.slack>=0)? Math.abs(s.slack-0.5) : 1000+Math.abs(s.slack)*100;
+    if(ratio!=null) cost += Math.abs(s.ratio-ratio)/ratio*200;
+    cost += niceRatioBonus(s.ratio);
+    if(s.N1===s.N2) cost -= 0.25;
+    cost += Math.max(0,12-s.N1)*4 + Math.max(0,12-s.N2)*4;
+    if(s.N1+s.N2>120) cost += (s.N1+s.N2-120)*0.4;
+    s.cost=cost;
+  }
+  out.sort((x,y)=>x.cost-y.cost);
+  return out.slice(0,limit);
+}
+const rng=(a,b)=>{const r=[];for(let i=a;i<=b;i++)r.push(i);return r;};
+
+function verdict(slack){
+  if(slack < -0.15) return {cls:'bad',txt:'TOO TIGHT',note:'belt shorter than path — size up a tooth or pull centers in'};
+  if(slack <= 1.0)  return {cls:'ok',  txt:'DROP-IN',  note:'install compliance / light spring takes it up'};
+  if(slack <= 3.0)  return {cls:'ok',  txt:'TENSIONER',note:'small spring tensioner or idler, ~'+(slack/2).toFixed(1)+' mm pull'};
+  if(slack <= 8.0)  return {cls:'warnc',txt:'IDLER',    note:'real idler travel, ~'+(slack/2).toFixed(1)+' mm inward at midspan'};
+  return {cls:'warnc',txt:'LOOSE',note:'a lot of slack — consider a shorter belt'};
+}
+
+// ---- lock UI ----
+function setLock(id,on){
+  const f=document.getElementById(id), btn=f.querySelector('.lock'), inp=f.querySelector('input');
+  btn.dataset.on=on?'1':'0'; btn.textContent=on?'LOCK':'SOLVE'; inp.disabled=!on;
+  if(on) inp.focus();
+}
+document.querySelectorAll('.field .lock').forEach(btn=>{
+  btn.addEventListener('click',()=>{ const f=btn.closest('.field'); setLock(f.id, btn.dataset.on!=='1'); });
+});
+function lockedVal(id){ const f=document.getElementById(id);
+  if(f.querySelector('.lock').dataset.on!=='1') return null;
+  const v=parseFloat(f.querySelector('input').value); return isFinite(v)?v:null; }
+// is this field locked-on but with no usable value typed in?
+function lockedEmpty(id){ const f=document.getElementById(id);
+  if(f.querySelector('.lock').dataset.on!=='1') return false;
+  return !isFinite(parseFloat(f.querySelector('input').value)); }
+
+// belt unit readout
+function updBelt(){
+  const p=pitchVal(document.getElementById('pitch').value);
+  const f=document.getElementById('f_T');
+  const on=f.querySelector('.lock').dataset.on==='1';
+  const t=parseFloat(f.querySelector('input').value);
+  document.getElementById('beltunit').textContent =
+    (on&&isFinite(t)) ? `teeth · ${(t*p).toFixed(1)} mm pitch length` : 'teeth (locked) / solved';
+}
+document.getElementById('pitch').addEventListener('change',updBelt);
+document.querySelector('#f_T input').addEventListener('input',updBelt);
+
+function parseRatio(s){
+  s=(s||'').trim(); if(!s) return null;
+  if(s.includes(':')){const[a,b]=s.split(':').map(Number); if(a>0&&b>0) return a/b; return null;}
+  const v=parseFloat(s); return (isFinite(v)&&v>0)?v:null;
+}
+
+document.getElementById('run').addEventListener('click',run);
+function run(){
+  const msg=document.getElementById('msg'), res=document.getElementById('results');
+  msg.className='msg'; res.innerHTML='';
+  const p=pitchVal(document.getElementById('pitch').value);
+  const N1=lockedVal('f_N1'), N2=lockedVal('f_N2'), C=lockedVal('f_C'), T=lockedVal('f_T');
+  const ratio=parseRatio(document.getElementById('ratio').value);
+  const Nmin=Math.max(6,parseInt(document.getElementById('nmin').value)||10);
+  const Nmax=Math.max(Nmin,parseInt(document.getElementById('nmax').value)||80);
+
+  const teethBothLocked = N1!=null && N2!=null;
+
+  // locked but no value typed — the most common confusion (buttons lit, fields blank)
+  const labels={f_N1:'Pulley A',f_N2:'Pulley B',f_C:'Center distance',f_T:'Belt'};
+  const blanks=Object.keys(labels).filter(lockedEmpty).map(k=>labels[k]);
+  if(blanks.length){
+    msg.className='msg err';
+    msg.textContent=`Locked but empty: ${blanks.join(', ')}. Enter a value, or switch ${blanks.length>1?'them':'it'} to SOLVE.`;
+    return;
+  }
+  if(C==null && T==null && !teethBothLocked){
+    msg.className='msg err';
+    msg.textContent='Anchor the solve: lock a center distance or a belt (or lock both pulleys).';
+    return;
+  }
+  if(C==null && T==null && teethBothLocked){
+    // family: sweep belts, exact-fit C each
+    const base=Math.round(geoLength(N1,N2, (N1+N2)*p/2 , p)/p); // rough seed
+    const rows=[];
+    for(let t=base-3;t<=base+3;t++){ const sc=solveC(N1,N2,t,p); if(sc) rows.push({N1,N2,ratio:N2/N1,beltT:t,actualC:sc,exactC:sc,slack:0}); }
+    msg.textContent=`${N1}T + ${N2}T · exact-fit center for each nearby belt size (pitch ${p} mm).`;
+    render(rows,false); return;
+  }
+
+  const sol=solve({p,N1,N2,C,T,ratio,Nmin,Nmax,limit:14});
+  if(!sol.length){ msg.className='msg err'; msg.textContent='No pairs in range. Widen the tooth range or relax the ratio.'; return; }
+  const locks=[N1!=null&&'A',N2!=null&&'B',C!=null&&'C',T!=null&&'belt'].filter(Boolean).join(', ');
+  msg.textContent=`Locked: ${locks||'none'} · pitch ${p} mm${ratio?` · target ratio ${ratio.toFixed(3)}`:''} · ${sol.length} result(s), best first.`;
+  render(sol,true);
+}
+
+function render(rows,rankable){
+  const res=document.getElementById('results');
+  let h=`<table><thead><tr>
+    <th>PAIR</th><th>RATIO</th><th>BELT</th><th class="num">CENTER</th>
+    <th class="num hideS">EXACT C</th><th class="num">SLACK</th><th>FIT</th></tr></thead><tbody>`;
+  rows.forEach((s,i)=>{
+    const v=verdict(s.slack);
+    const dC=(s.actualC-s.exactC);
+    h+=`<tr class="row${i===0&&rankable?' best':''}">
+      <td class="lead">${s.N1}T + ${s.N2}T</td>
+      <td class="num">${s.ratio.toFixed(3)}<span style="color:var(--amber-dim)"> :1</span></td>
+      <td class="num">${s.beltT}T <span style="color:var(--amber-dim)">${(s.beltT*currentP()).toFixed(0)}mm</span></td>
+      <td class="num">${s.actualC.toFixed(2)}</td>
+      <td class="num hideS" style="color:var(--amber-dim)">${s.exactC.toFixed(2)}${rankable?` <span style="font-size:10px">(${dC>=0?'+':''}${dC.toFixed(2)})</span>`:''}</td>
+      <td class="num ${s.slack<-0.15?'bad':''}">${s.slack>=0?'+':''}${s.slack.toFixed(2)}<span style="color:var(--amber-dim)"> mm</span></td>
+      <td><span class="pill ${v.cls}">${v.txt}</span><div class="verdict-note">${v.note}</div></td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  res.innerHTML=h;
+}
+function currentP(){ return pitchVal(document.getElementById('pitch').value); }
+
+updBelt(); run();
+</script>
+</body>
+</html>
